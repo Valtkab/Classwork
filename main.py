@@ -22,8 +22,8 @@ async def anketa_handler(msg: Message, state: FSMContext):
         InlineKeyboardButton(text='Отмена', callback_data='cancel_anketa')]])
     await msg.answer('Введите ваше имя', reply_markup=markup)
 
-router.callback_query(F.data == 'cancel_anketa')
-async def next_handler(callback_query: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data == 'cancel_anketa')
+async def cancel_handler(callback_query: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback_query.message.answer('Регистрация отмена')
 
@@ -47,31 +47,51 @@ async def set_name_by_anketa_handler(msg: Message, state: FSMContext):
     except ValueError:
        await msg.answer('Вы не верно ввели возраст!')
        markup = InlineKeyboardMarkup(inline_keyboard=[[
-          InlineKeyboardButton(text='Назад', callback_data='set_name_anket'),
+          InlineKeyboardButton(text='Назад', callback_data='back_anketa'),
           InlineKeyboardButton(text='Отмена', callback_data='cancel_anketa'),]])
        await msg.answer('Введите ваш возраст', reply_markup=markup)
        return
 
     await state.set_state(Anketa.gender)
-    markup = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text='Назад', callback_data='set_name_anket'),
-        InlineKeyboardButton(text='Отмена', callback_data='cancel_anketa'),]])
+    markup = InlineKeyboardMarkup(inline_keyboard=[
+        [
+        InlineKeyboardButton(text='Назад', callback_data='back_anketa'),
+        InlineKeyboardButton(text='Отмена', callback_data='cancel_anketa'),
+        ],[
+        InlineKeyboardButton(text='Мужской', callback_data='gender_m'),
+        InlineKeyboardButton(text='Женский', callback_data='gender_w'),
+        ]])
     await msg.answer('Введите ваш пол', reply_markup=markup)
 
-@router.callback_query(F.data == 'set_age_anketa')
+@router.callback_query(F.data == 'back_anketa')
 async def set_age_anketa_handler(callback_query: CallbackQuery, state: FSMContext):
-    await state.set_state(Anketa.age)
-    markup = InlineKeyboardMarkup(inline_keyboard=[[
-          InlineKeyboardButton(text='Назад', callback_data='set_name_anket'),
-          InlineKeyboardButton(text='Отмена', callback_data='cancel_anketa'),]])
-    await callback_query.message.answer('Введите ваш возраст', reply_markup=markup)
-   
-@router.message(Anketa.gender)
-async def set_age_anketa_handler(msg: CallbackQuery, state: FSMContext):
-    await state.update_date(gender=msg.text)
-    await msg.answer(str(await state.get_data()))
-    await state.clear
+    current_state = await state.get_state()
+    if current_state == Anketa.gender:
+        await state.set_state(Anketa.age)
+        markup = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text='Назад', callback_data='set_name_anket'),
+            InlineKeyboardButton(text='Отмена', callback_data='cancel_anketa'),]])
+        await callback_query.message.answer('Введите ваш возраст', reply_markup=markup)
 
+    elif current_state == Anketa.age:
+        await state.set_state(Anketa.name)
+        markup = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text='Отмена', callback_data='cancel_anketa'),]])
+        await callback_query.message.answer("Ведите ваше имя", reply_markup=markup)
+
+
+@router.callback_query(F.data.startwiht('gender_' and Anketa.gender))
+async def set_age_anketa_handler(callback_query: CallbackQuery, state: FSMContext):
+    gender = {'gender_m':'Мужской', 'gender_w':'Женский'}[callback_query.data]
+    await state.update_data(gender=gender)
+    await callback_query.message.answer(str(await state.get_data()))
+    await state.clear()
+
+
+@router.message(Anketa.gender)
+async def set_age_by_anketa_handler(msg: Message, state: FSMContext):
+    await msg.answer('Нужно пол выбрать кнопкой')
+   
 @router.message(Command("start"))
 async def start_handler(msg: Message):
     await bot.set_my_commands([
@@ -92,6 +112,8 @@ async def next_handler(callback_query: CallbackQuery):
     ])
     await callback_query.message.edit_text(
         'Страница 2', reply_markup=inline_markup)
+
+
 
 @router.callback_query(F.data == 'back')
 async def back_handler(callback_query: CallbackQuery):
